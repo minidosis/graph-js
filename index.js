@@ -20,14 +20,34 @@ const LinkType = LinkTypeArray.reduce((typ, val) => { typ[val] = val; return typ
 class Node {
   constructor(id) {
     this.id = id
-    this.links = new Map()
+    this.bases = new Set()
+    this.derived = new Set()
+    this.parents = new Set()
+    this.children = new Set()
+    this.related = new Set()
   }
+
+  addBase(id) { this.bases.add(id) }
+  addParent(id) { this.parents.add(id) }
+  addChild(id) { this.children.add(id) }
+  addDerived(id) { this.derived.add(id) }
+  addRelated(id) { this.related.add(id) }
 
   setFilename(filename) { this.filename = filename }
 
   clearLinks() { this.links = new Map() }
 
-  addLink(type, id) { this.links.set(id, type) }
+  addLink(type, id) {
+    switch (type) {
+      case 'Base': this.addBase(id); break;
+      case 'Derived': this.addDerived(id); break;
+      case 'Child': this.addChild(id); break;
+      case 'Parent': this.addParent(id); break;
+      case 'Related': this.addRelated(id); break;
+      default: throw new Error('unknown link type: ' + type);
+    }
+  }
+
   addLinks(type, idlist) { idlist.forEach(id => this.addLink(type, id)) }
 
   show() {
@@ -53,12 +73,12 @@ class Node {
 
   toJson() {
     const node = { ...this };
-    for (let type in LinkType) {
-      node[listName[type]] = [];
+    for (let linkset of ['bases', 'derived', 'parents', 'children', 'related']) {
+      if (linkset in node) {
+        node[linkset] = Array.from(node[linkset])
+          .map(id => ({ id, title: graph.get(id).title }));
+      }
     }
-    this.links.forEach((type, id) => {
-      node[listName[type]].push({ id, title: graph.get(id).title })
-    })
     return JSON.stringify(node);
   }
 }
