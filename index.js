@@ -2,7 +2,7 @@
 const fs = require('fs')
 const sha1 = require('sha1')
 const { parseFile, parseAllFiles } = require('./parser')
-const markright = require('../markright')
+const markright = require('@minidosis/markright')
 
 const GRAPH_DIR = process.env.MINIDOSIS_GRAPH
 if (!GRAPH_DIR) {
