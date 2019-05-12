@@ -153,34 +153,28 @@ class Graph {
   }
 
   readAll() {
-    this.nodes = new Map()
-    this.images = new Map()
-    parseAllFiles(GRAPH_DIR, this.updateNode.bind(this))
+    try {
+      this.nodes = new Map()
+      this.images = new Map()
+      parseAllFiles(GRAPH_DIR, this.updateNode.bind(this))
+    } 
+    catch (e) {
+      console.error("graph.readAll error:", e)
+    }
+  }
+
+  watchForChanges() {
+    let files = fs.readdirSync(GRAPH_DIR, { withFileTypes: true })
+    const dirs = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
+    for (let d of dirs) {
+      const subdir = GRAPH_DIR + '/' + d.name
+      fs.watch(subdir, () => this.readAll())
+      watchDir(subdir)
+    }
   }
 }
 
 const graph = new Graph()
-
-const rereadGraph = (event, filename) => {
-  try {
-    console.log('re-read graph')
-    graph.readAll()
-  } catch (e) {
-    console.error("graph.readAll error:", e)
-  }
-}
-
-const watchDir = (root) => {
-  let files = fs.readdirSync(root, { withFileTypes: true })
-  const dirs = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
-  for (let d of dirs) {
-    const subdir = root + '/' + d.name
-    fs.watch(subdir, rereadGraph)
-    watchDir(subdir)
-  }
-}
-
-watchDir(GRAPH_DIR)
 
 module.exports = { graph }
 
