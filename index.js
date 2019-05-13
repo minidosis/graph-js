@@ -1,4 +1,5 @@
 
+const path = require('path')
 const fs = require('fs')
 const sha1 = require('sha1')
 const { parseFile, parseAllFiles } = require('./parser')
@@ -132,20 +133,29 @@ class Graph {
     this.nodes.forEach(node => node.show())
   }
 
-  getImageHash(path) {
-    const abspath = GRAPH_DIR + '/' + path
+  getImageHash(base_dir, imgpath) {
+    const abspath = path.join(base_dir, imgpath)
     const hash = sha1(fs.readFileSync(abspath))
     this.images.set(hash, abspath)
     return hash
   }
 
-  updateNode(filename, minidosisName, header, contentString) {
+  updateNode(full_path, minidosisName, header, contentString) {
     const content = markright.parse(contentString, {
-      img: ({ args, children: path }) => ({
-        id: 'img', children: [this.getImageHash(path[0])]
-      })
+      img: ({ args, children }) => {
+        try {
+          const base_path = path.dirname(full_path)
+          const hash = this.getImageHash(base_path, children[0])
+          return { id: 'img', children: [hash] }
+        }
+        catch (e) {
+          const msg = `Failed to update image '${children[0]}' in node '${full_path}':`
+          console.error('updateNode:', msg, e.toString())
+          return { id: 'img', children: msg }
+        }
+      }
     })
-    this.addNode(GRAPH_DIR + '/' + filename, minidosisName, header, content)
+    this.addNode(full_path, minidosisName, header, content)
   }
 
   readFile(filename) {
@@ -153,24 +163,22 @@ class Graph {
   }
 
   readAll() {
-    try {
-      this.nodes = new Map()
-      this.images = new Map()
-      parseAllFiles(GRAPH_DIR, this.updateNode.bind(this))
-    } 
-    catch (e) {
-      console.error("graph.readAll error:", e)
-    }
+    this.nodes = new Map()
+    this.images = new Map()
+    parseAllFiles(GRAPH_DIR, this.updateNode.bind(this))
   }
 
   watchForChanges() {
-    let files = fs.readdirSync(GRAPH_DIR, { withFileTypes: true })
-    const dirs = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
-    for (let d of dirs) {
-      const subdir = GRAPH_DIR + '/' + d.name
-      fs.watch(subdir, () => this.readAll())
-      watchDir(subdir)
+    const watchDir = (dir) => {
+      let files = fs.readdirSync(dir, { withFileTypes: true })
+      const dirs = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
+      for (let d of dirs) {
+        const subdir = dir + '/' + d.name
+        fs.watch(subdir, () => this.readAll())
+        watchDir(subdir)
+      }
     }
+    watchDir(GRAPH_DIR)
   }
 }
 

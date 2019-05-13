@@ -1,5 +1,6 @@
 
 const fs = require('fs');
+const path = require('path')
 
 const error = (msg) => { throw new Error(msg) }
 
@@ -120,20 +121,26 @@ const parseHeader = (header) => parseTree(header, 0).tree
 const minidosisName = (filename) => filename.split('.')[0]
 
 const parseFile = (dir, file, callback) => {
-  const full_path = dir + '/' + file;
-  const { header, content } = splitHeader(full_path)
-  callback(file, minidosisName(file), parseHeader(header), content)
+  const full_path = path.join(dir, file);
+  try {
+    const { header, content } = splitHeader(full_path)
+    callback(full_path, minidosisName(file), parseHeader(header), content)
+  } 
+  catch (e) {
+    console.error(`Error parsing ${full_path}:`, e)
+  }
 }
 
 const parseAllFiles = (dir, callback) => {
   let files = fs.readdirSync(dir, { withFileTypes: true })
-  const minidosis_files = files.filter(f => f.name.endsWith('.minidosis'))
-  for (let file of minidosis_files) {
-    parseFile(dir, file.name, callback)
-  }
+  // depth first
   const directories = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
   for (let subdir of directories) {
     parseAllFiles(dir + '/' + subdir.name, callback)
+  }
+  const minidosis_files = files.filter(f => f.name.endsWith('.minidosis'))
+  for (let file of minidosis_files) {
+    parseFile(dir, file.name, callback)
   }
 }
 
