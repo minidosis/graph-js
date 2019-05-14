@@ -180,6 +180,18 @@ class Graph {
     }
     watchDir(GRAPH_DIR)
   }
+
+  search(query) {
+    console.log(query)
+    const upperQuery = query.toUpperCase()
+    const results = []
+    this.forEachNode((_, node) => {
+      if (node.title && node.title.toUpperCase().indexOf(upperQuery) !== -1) {
+        results.push(node)
+      }
+    })
+    return results
+  }
 }
 
 const graph = new Graph()
