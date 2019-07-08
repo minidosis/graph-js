@@ -2,7 +2,6 @@
 const path = require('path')
 const fs = require('fs')
 const sha1 = require('sha1')
-const { parseFile, parseAllFiles } = require('./parser')
 const markright = require('@minidosis/markright')
 
 const GRAPH_DIR = process.env.MINIDOSIS_GRAPH
@@ -49,7 +48,9 @@ class Node {
     }
   }
 
-  addLinks(type, idlist) { idlist.forEach(id => this.addLink(type, id)) }
+  addLinks(type, idlist) { 
+    idlist.forEach(id => this.addLink(type, id)) 
+  }
 
   show() {
     const $ = (s) => console.log(s)
@@ -85,10 +86,6 @@ class Node {
 }
 
 class Graph {
-  constructor() {
-    this.readAll()
-  }
-
   has(id) { return this.nodes.has(id) }
   hasImage(id) { return this.images.has(id) }
 
@@ -140,32 +137,66 @@ class Graph {
     return hash
   }
 
-  updateNode(full_path, minidosisName, header, contentString) {
-    const content = markright.parse(contentString, {
-      img: ({ args, children }) => {
-        try {
-          const base_path = path.dirname(full_path)
-          const hash = this.getImageHash(base_path, children[0])
-          return { id: 'img', children: [hash] }
-        }
-        catch (e) {
-          const msg = `Failed to update image '${children[0]}' in node '${full_path}':`
-          console.error('updateNode:', msg, e.toString())
-          return { id: 'img', children: msg }
-        }
+  pathToHash(fullPath) {
+    return ({ children }) => {
+      try {
+        const base_path = path.dirname(fullPath)
+        const hash = this.getImageHash(base_path, children[0])
+        return { id: 'img', children: [hash] }
       }
-    })
-    this.addNode(full_path, minidosisName, header, content)
+      catch (e) {
+        const msg = `Failed to update image '${children[0]}' in node '${fullPath}':`
+        console.error('updateNode:', msg, e.toString())
+        return { id: 'img', children: msg }
+      }
+    }
   }
 
-  readFile(filename) {
-    parseFile(GRAPH_DIR, filename, this.updateNode.bind(this))
+  readFile(dir, filename) {
+    const fullPath = path.join(dir, filename)
+    const textContent = String(fs.readFileSync(fullPath))
+    const minidosisID = filename.split('.')[0]
+    const [first, ...content] = markright.parse(textContent, {
+      img: this.pathToHash(fullPath),
+    });
+
+    if (!markright.isCommandNode(first, 'graph')) {
+      throw Error(`File '${fullPath} does not have a 'graph' node!`)
+    } 
+    else {
+      const header = markright.toJson(first.children)
+      const commaSplit = x => {
+        if (x in header) {
+          header[x] = header[x].trim().split(/\s+/)
+        }
+      }
+      ['bases', 'children', 'related'].map(commaSplit)
+      this.addNode(fullPath, minidosisID, header, content)
+    }
   }
 
   readAll() {
     this.nodes = new Map()
     this.images = new Map()
-    parseAllFiles(GRAPH_DIR, this.updateNode.bind(this))
+
+    const parseDir = (dir) => {
+      let files = fs.readdirSync(dir, { withFileTypes: true })
+      // depth first
+      const directories = files.filter(f => f.isDirectory() && !f.name.startsWith('.'))
+      for (let subdir of directories) {
+        parseDir(dir + '/' + subdir.name)
+      }
+      const minidosis_files = files.filter(f => f.name.endsWith('.minidosis'))
+      for (let file of minidosis_files) {
+        try {
+          this.readFile(dir, file.name)
+        } catch (e) {
+          console.error(`Error reading ${file.name}: ${e.toString()}`)
+        }
+
+      }
+    }
+    parseDir(GRAPH_DIR)
   }
 
   watchForChanges() {
@@ -182,7 +213,6 @@ class Graph {
   }
 
   search(query) {
-    console.log(query)
     const upperQuery = query.toUpperCase()
     const results = []
     this.forEachNode((_, node) => {
@@ -197,4 +227,3 @@ class Graph {
 const graph = new Graph()
 
 module.exports = { graph }
-
