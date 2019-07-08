@@ -225,5 +225,6 @@ class Graph {
 }
 
 const graph = new Graph()
+graph.readAll()
 
 module.exports = { graph }
