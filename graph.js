@@ -25,6 +25,7 @@ class Node {
     this.parents = new Set()
     this.children = new Set()
     this.related = new Set()
+    // this.content = [] ?
   }
 
   addBase(id) { this.bases.add(id) }
