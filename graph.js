@@ -216,7 +216,10 @@ class Graph {
     const upperQuery = query.toUpperCase()
     const results = []
     this.forEachNode((_, node) => {
-      if (node.title && node.title.toUpperCase().indexOf(upperQuery) !== -1) {
+      if (node.title &&
+          typeof node.title === 'string' &&
+          node.title.toUpperCase().indexOf(upperQuery) !== -1)
+      {
         results.push(node)
       }
     })
