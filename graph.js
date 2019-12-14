@@ -49,8 +49,8 @@ class Node {
     }
   }
 
-  addLinks(type, idlist) { 
-    idlist.forEach(id => this.addLink(type, id)) 
+  addLinks(type, idlist) {
+    idlist.forEach(id => this.addLink(type, id))
   }
 
   show() {
@@ -156,24 +156,32 @@ class Graph {
   readFile(dir, filename) {
     const fullPath = path.join(dir, filename)
     const textContent = String(fs.readFileSync(fullPath))
+    const contentLines = textContent.split('\n')
     const minidosisID = filename.split('.')[0]
-    const [first, ...content] = markright.parse(textContent, {
-      img: this.pathToHash(fullPath),
-    });
 
-    if (!markright.isCommandNode(first, 'graph')) {
-      throw Error(`File '${fullPath} does not have a 'graph' node!`)
-    } 
-    else {
-      const header = markright.toJson(first.children)
-      const commaSplit = x => {
-        if (x in header) {
-          header[x] = header[x].trim().split(/\s+/)
-        }
+    const header = {}
+    let content;
+
+    const block = markright.parse(contentLines, {
+      img: (_, path) => {
+        const imagePath = path.join(dir, path)
+        const hash = this.pathToHash(imagePath)
+        console.log(`image: '${imagePath}' -> ${hash}`)
+        return 'image'
+      },
+      graph: (_, children) => {
+        markright.parse(children, {
+          title: (_, children) => header.title = children[0],
+          bases: (_, children) => header.bases = children,
+          children: (_, children) => header.children = children,
+          related: (_, children) => header.related = children,
+        })
+      },
+      text: (_, children) => {
+        content = markright.parseRecur(children).toJson()
       }
-      ['bases', 'children', 'related'].map(commaSplit)
-      this.addNode(fullPath, minidosisID, header, content)
-    }
+    });
+    this.addNode(fullPath, minidosisID, header, content)
   }
 
   readAll() {
@@ -192,7 +200,7 @@ class Graph {
         try {
           this.readFile(dir, file.name)
         } catch (e) {
-          console.error(`Error reading ${file.name}: ${e.toString()}`)
+          console.error(`Error reading ${file.name}: ${e.stack}`)
         }
 
       }
@@ -218,9 +226,8 @@ class Graph {
     const results = []
     this.forEachNode((_, node) => {
       if (node.title &&
-          typeof node.title === 'string' &&
-          node.title.toUpperCase().indexOf(upperQuery) !== -1)
-      {
+        typeof node.title === 'string' &&
+        node.title.toUpperCase().indexOf(upperQuery) !== -1) {
         results.push(node)
       }
     })
